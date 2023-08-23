@@ -235,6 +235,6 @@ jobs:
         # download-artifact puts these files in their own dirs...
         # Using globs sidesteps having to pass the version around
         files: |
-#          */*.exe
           */*.zip
           */*.dmg
+#          */*.exe
