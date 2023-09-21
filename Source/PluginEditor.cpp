@@ -57,16 +57,36 @@ void PluginEditor::drawNextFrameOfSpectrum()
 
 void PluginEditor::drawFrame (juce::Graphics& g)
 {
+    auto width  = getLocalBounds().getWidth();
+    auto height = getLocalBounds().getHeight();
+
+    juce::Path path;
+    path.preallocateSpace(8 + scopeSize * 3);
+    path.startNewSubPath (
+        juce::jmap<float> (0, 0, scopeSize - 1, 0, width),
+        juce::jmap<float> (scopeData[0], 0.0f, 1.0f, (float) height, 0.0f)
+    );
+
     for (int i = 1; i < scopeSize; ++i)
     {
-        auto width  = getLocalBounds().getWidth();
-        auto height = getLocalBounds().getHeight();
-
-        g.drawLine ({ (float) juce::jmap (i - 1, 0, scopeSize - 1, 0, width),
-            juce::jmap (scopeData[i - 1], 0.0f, 1.0f, (float) height, 0.0f),
-            (float) juce::jmap (i,     0, scopeSize - 1, 0, width),
-            juce::jmap (scopeData[i],     0.0f, 1.0f, (float) height, 0.0f) });
+        path.lineTo (
+                juce::jmap<float> (i,     0, scopeSize - 1, 0, width),
+                juce::jmap<float> (scopeData[i],     0.0f, 1.0f, (float) height, 0.0f)
+        );
+//        g.drawLine ({
+//                        (float) juce::jmap (i - 1, 0, scopeSize - 1, 0, width),
+//                        juce::jmap (scopeData[i - 1], 0.0f, 1.0f, (float) height, 0.0f),
+//                        (float) juce::jmap (i,     0, scopeSize - 1, 0, width),
+//                        juce::jmap (scopeData[i],     0.0f, 1.0f, (float) height, 0.0f) },
+//                2.0f);
     }
+
+    path.lineTo (getLocalBounds().getBottomRight().toFloat());
+    path.lineTo (getLocalBounds().getBottomLeft().toFloat());
+    path.closeSubPath();
+    g.fillPath (path.createPathWithRoundedCorners(2));
+
+
 }
 
 void PluginEditor::timerCallback()
