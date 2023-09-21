@@ -165,6 +165,8 @@ FetchContent_MakeAvailable(Catch2) # find_package equivalent
 
 # Setup the test executable, again C++ 20 please
 add_executable(Tests ${TestFiles}
+        Source/Analyzer.h
+        Source/Analyzer.cpp
         Source/Analyzer.h)
 target_compile_features(Tests PRIVATE cxx_std_20)
 
