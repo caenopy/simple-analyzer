@@ -1,6 +1,21 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 
+static juce::Identifier fftID {"fftPlot"};
+static juce::String smoothTime{"smoothTime"}; // uniform initialization of juce::String
+
+static juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout()
+{
+    juce::AudioProcessorValueTreeState::ParameterLayout layout;
+
+    layout.add(std::make_unique<juce::AudioParameterFloat> (juce::ParameterID(smoothTime, 1),
+                                                            "Smooth Time (ms)",
+                                                            juce::NormalisableRange<float>(0, 500, 1),
+                                                            250));
+
+    return layout;
+}
+
 //==============================================================================
 PluginProcessor::PluginProcessor()
      : AudioProcessor (BusesProperties()
@@ -10,8 +25,17 @@ PluginProcessor::PluginProcessor()
                       #endif
                        .withOutput ("Output", juce::AudioChannelSet::stereo(), true)
                      #endif
-                       )
+                       ),
+      apvts (*this, &undoManager, "Parameters", createParameterLayout()),
+      forwardFFT (fftOrder),
+      window (fftSize, juce::dsp::WindowingFunction<float>::hann)
 {
+    apvts.addParameterListener (smoothTime, this);
+    for (int i = 0; i < 2 * fftSize; ++i)
+    {
+        smoothedFftData[i] = 0;
+        fftData[i] = 0;
+    }
 }
 
 PluginProcessor::~PluginProcessor()
@@ -89,12 +113,16 @@ void PluginProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
     // Use this method as the place to do any pre-playback
     // initialisation that you need..
     juce::ignoreUnused (sampleRate, samplesPerBlock);
+
+    fs = sampleRate;
+    preparedToPlay = true;
 }
 
 void PluginProcessor::releaseResources()
 {
     // When playback stops, you can use this as an opportunity to free up any
     // spare memory, etc.
+    preparedToPlay = false;
 }
 
 bool PluginProcessor::isBusesLayoutSupported (const BusesLayout& layouts) const
@@ -122,6 +150,9 @@ bool PluginProcessor::isBusesLayoutSupported (const BusesLayout& layouts) const
 void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
                                               juce::MidiBuffer& midiMessages)
 {
+    if (not preparedToPlay)
+        return;
+
     juce::ignoreUnused (midiMessages);
 
     juce::ScopedNoDenormals noDenormals;
@@ -143,11 +174,45 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     // the samples and the outer loop is handling the channels.
     // Alternatively, you can process the samples with the channels
     // interleaved by keeping the same state.
-    for (int channel = 0; channel < totalNumInputChannels; ++channel)
+
+    // Get left channel
+    auto *channelData = buffer.getReadPointer(0);
+
+    // Accumulate in FIFO buffer
+    for (auto i = 0; i < buffer.getNumSamples(); i++)
     {
-        auto* channelData = buffer.getWritePointer (channel);
-        juce::ignoreUnused (channelData);
-        // ..do something to the data...
+        // Push next sample into FIFO
+        fifo[fifoIndex++] = channelData[i];
+
+        if (fifoIndex == fftSize)
+        {
+            if (not nextFFTBlockReady)
+            {
+                // Zero temp FFT buffer
+                juce::zeromem (fftData, sizeof (fftData));
+                // Copy audio buffer into fftData for processing
+                memcpy (fftData, fifo, sizeof (fifo));
+                // Reset FIFO buffer index
+                fifoIndex = 0;
+                // Apply windowing function and do FFT
+                window.multiplyWithWindowingTable (fftData, fftSize);
+                forwardFFT.performFrequencyOnlyForwardTransform (fftData);
+
+                // Smooth FFT data for visualization
+                for (int n = 0; n < fftSize / 2; n++)
+                {
+                    smoothedFftData[n] = leak * smoothedFftData[n] + (1 - leak) * fftData[n];
+                }
+
+                //            for (int n = 0; n < fftSize; n++)
+                //            {
+                //                std::cout << smoothedFftData[n] << ", ";
+                //            }
+                //            std::cout << "\n";
+
+                nextFFTBlockReady = true;
+            }
+        }
     }
 }
 
@@ -159,7 +224,10 @@ bool PluginProcessor::hasEditor() const
 
 juce::AudioProcessorEditor* PluginProcessor::createEditor()
 {
-    return new PluginEditor (*this);
+    // Generic GUI for prototyping:
+//    return new juce::GenericAudioProcessorEditor (*this);
+
+     return new PluginEditor (*this);
 }
 
 //==============================================================================
@@ -176,6 +244,14 @@ void PluginProcessor::setStateInformation (const void* data, int sizeInBytes)
     // You should use this method to restore your parameters from this memory block,
     // whose contents will have been created by the getStateInformation() call.
     juce::ignoreUnused (data, sizeInBytes);
+}
+
+void PluginProcessor::parameterChanged (const juce::String& parameterID, float newValue)
+{
+    if (parameterID == smoothTime) {
+        leak = newValue < .1 ? 0.0 : static_cast<float> (std::exp (-(fftSize) / (newValue * 0.001 * fs)));
+        jassert(leak <= 1 && leak >= 0);
+    }
 }
 
 //==============================================================================

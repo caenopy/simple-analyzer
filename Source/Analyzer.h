@@ -1,0 +1,8 @@
+//
+// Created by Nic Becker on 9/16/23.
+//
+
+#ifndef SIMPLE_ANALYZER_ANALYZER_H
+#define SIMPLE_ANALYZER_ANALYZER_H
+
+#endif //SIMPLE_ANALYZER_ANALYZER_H

@@ -1,12 +1,14 @@
 #pragma once
 
-#include <juce_audio_processors/juce_audio_processors.h>
+#include <JuceHeader.h>
+#include "Analyzer.h"
 
 #if (MSVC)
 #include "ipps.h"
 #endif
 
-class PluginProcessor : public juce::AudioProcessor
+class PluginProcessor : public juce::AudioProcessor,
+                        private juce::AudioProcessorValueTreeState::Listener  // Listener for parameters
 {
 public:
     PluginProcessor();
@@ -38,6 +40,34 @@ public:
     void getStateInformation (juce::MemoryBlock& destData) override;
     void setStateInformation (const void* data, int sizeInBytes) override;
 
+    void parameterChanged (const juce::String& parameterID, float newValue) override;
+
+    enum
+    {
+        fftOrder  = 11,
+        fftSize   = 1 << fftOrder, // 2048
+        scopeSize = fftSize >> 1   // 1024
+    };
+
+    bool nextFFTBlockReady = false;
+    float smoothedFftData [2 * fftSize];
 private:
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (PluginProcessor)
+
+    bool preparedToPlay = false;
+
+    // Parameters
+    float leak;
+    double fs;
+
+    // APVTS and Undo Manager
+    juce::AudioProcessorValueTreeState apvts;
+    juce::UndoManager undoManager;
+
+    // FFT Setup
+    juce::dsp::FFT forwardFFT;
+    juce::dsp::WindowingFunction<float> window;
+    float fifo [fftSize];
+    float fftData [2 * fftSize]; // dsp::FFT requires the size of the array passed in to be 2 * getSize().
+    int fifoIndex = 0;
 };

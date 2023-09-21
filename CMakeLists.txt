@@ -63,6 +63,8 @@ juce_add_plugin("${PROJECT_NAME}"
     FORMATS "${FORMATS}"
     PRODUCT_NAME "${PROJECT_NAME}")             # The name of the final executable, which can differ from the target name
 
+juce_generate_juce_header("${PROJECT_NAME}")
+
 # C++20, please
 target_compile_features("${PROJECT_NAME}" PRIVATE cxx_std_20)
 
@@ -122,6 +124,7 @@ target_link_libraries("${PROJECT_NAME}"
     Assets
     juce::juce_audio_utils
     juce::juce_audio_processors
+        juce::juce_dsp
     PUBLIC
     juce::juce_recommended_config_flags
     juce::juce_recommended_lto_flags
@@ -161,7 +164,8 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(Catch2) # find_package equivalent
 
 # Setup the test executable, again C++ 20 please
-add_executable(Tests ${TestFiles})
+add_executable(Tests ${TestFiles}
+        Source/Analyzer.h)
 target_compile_features(Tests PRIVATE cxx_std_20)
 
 # Our test executable also wants to know about our plugin code...
