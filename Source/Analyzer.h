@@ -15,15 +15,27 @@
 //==============================================================================
 /*
 */
-class Analyzer  : public juce::Component
+
+class PluginProcessor; // Forward declaration
+
+class Analyzer  : public juce::Component,
+                  public juce::Timer
 {
 public:
-  Analyzer();
-  ~Analyzer() override;
+    explicit Analyzer(PluginProcessor&);
+    ~Analyzer() override;
 
-  void paint (juce::Graphics&) override;
-  void resized() override;
+    void paint (juce::Graphics&) override;
+    void resized() override;
+    void timerCallback() override;
+
+    void drawNextFrameOfSpectrum();
+    void drawFrame (juce::Graphics& g);
 
 private:
-  JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (Analyzer)
+    PluginProcessor& processorRef;
+    int scopeSize;
+    std::vector<float> scopeData;
+
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (Analyzer)
 };

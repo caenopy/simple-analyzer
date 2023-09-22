@@ -49,7 +49,7 @@ public:
         scopeSize = fftSize >> 1   // 1024
     };
 
-    bool nextFFTBlockReady = false;
+    juce::Atomic<bool> nextFFTBlockReady = false;
     float smoothedFftData [2 * fftSize];
 private:
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (PluginProcessor)

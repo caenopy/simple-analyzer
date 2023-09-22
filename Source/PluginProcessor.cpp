@@ -182,11 +182,12 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     for (auto i = 0; i < buffer.getNumSamples(); i++)
     {
         // Push next sample into FIFO
-        fifo[fifoIndex++] = channelData[i];
+        if (fifoIndex < fftSize)
+            fifo[fifoIndex++] = channelData[i];
 
         if (fifoIndex == fftSize)
         {
-            if (not nextFFTBlockReady)
+            if (not nextFFTBlockReady.get())
             {
                 // Zero temp FFT buffer
                 juce::zeromem (fftData, sizeof (fftData));
