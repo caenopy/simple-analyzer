@@ -228,7 +228,7 @@ juce::AudioProcessorEditor* PluginProcessor::createEditor()
     // Generic GUI for prototyping:
 //    return new juce::GenericAudioProcessorEditor (*this);
 
-     return new PluginEditor (*this);
+     return new PluginEditor (*this, apvts);
 }
 
 //==============================================================================
