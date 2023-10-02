@@ -9,7 +9,8 @@ PluginEditor::PluginEditor (PluginProcessor& p, juce::AudioProcessorValueTreeSta
       processorRef (p),
       undoManager (um),
       apvts (vts),
-      scope (p, fs)
+      scope (p, fs),
+      testDial  (*vts.getParameter ("smoothTime"),  &um)
 {
     setWantsKeyboardFocus (true);
     juce::ignoreUnused (processorRef);
@@ -22,9 +23,16 @@ PluginEditor::PluginEditor (PluginProcessor& p, juce::AudioProcessorValueTreeSta
 
     smoothTimeDial.setSliderStyle (juce::Slider::Rotary);
     smoothTimeDial.setTextBoxStyle (juce::Slider::NoTextBox, false, 0, 0);
-    addAndMakeVisible(smoothTimeDial);
     smoothTimeAttachment = std::make_unique<SliderAttachment> (apvts, "smoothTime", smoothTimeDial);
 
+    testDial.setLabelText ("smooth");
+
+    // Set interval of values changed by arrow keys or shift + arrow keys.
+    testDial.setInterval (5.0f);
+    testDial.setFineInterval (1.0f);
+
+    addAndMakeVisible(smoothTimeDial);
+    addAndMakeVisible(testDial);
 }
 
 PluginEditor::~PluginEditor()
@@ -49,6 +57,8 @@ void PluginEditor::resized()
 
     auto dialArea = r.withTrimmedTop(15 * border);
     smoothTimeDial.setBounds (dialArea);
+
+    testDial.setBounds  (325,  300,  80, 95);
 }
 
 bool PluginEditor::keyPressed (const juce::KeyPress& key)

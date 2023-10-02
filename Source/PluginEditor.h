@@ -1,6 +1,7 @@
 #pragma once
 
 #include "PluginProcessor.h"
+#include "Dial.h"
 
 //==============================================================================
 class PluginEditor : public juce::AudioProcessorEditor
@@ -29,9 +30,11 @@ private:
     juce::AudioProcessorValueTreeState& apvts;
 
     Analyzer scope;
-    juce::Slider smoothTimeDial;
 
+    juce::Slider smoothTimeDial;
     std::unique_ptr<SliderAttachment> smoothTimeAttachment;
+
+    Dial testDial;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (PluginEditor)
 };
