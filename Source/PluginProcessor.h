@@ -51,6 +51,7 @@ public:
 
     juce::Atomic<bool> nextFFTBlockReady = false;
     float smoothedFftData [2 * fftSize];
+    float maxSmoothedFftData [2 * fftSize];
 private:
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (PluginProcessor)
 
@@ -58,6 +59,7 @@ private:
 
     // Parameters
     float leak;
+    float maxLeak;
     double fs;
 
     // APVTS and Undo Manager

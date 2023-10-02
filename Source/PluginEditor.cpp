@@ -4,18 +4,18 @@
 #include "PluginProcessor.h"
 
 //==============================================================================
-PluginEditor::PluginEditor (PluginProcessor& p, juce::AudioProcessorValueTreeState& vts)
+PluginEditor::PluginEditor (PluginProcessor& p, juce::AudioProcessorValueTreeState& vts, double fs)
     : AudioProcessorEditor (&p),
       processorRef (p),
       apvts (vts),
-      scope (p)
+      scope (p, fs)
 {
     juce::ignoreUnused (processorRef);
 
     // Make sure that before the constructor has finished, you've set the
     // editor's size to whatever you need it to be.
     setOpaque(true);
-    setSize (700, 500);
+    setSize (500, 400);
     addAndMakeVisible(scope);
 
     smoothTimeDial.setSliderStyle (juce::Slider::Rotary);
@@ -39,12 +39,12 @@ void PluginEditor::paint (juce::Graphics& g)
 
 void PluginEditor::resized()
 {
-    auto border = 4;
+    auto border = 20;
 
     // lay out the positions of your components
     juce::Rectangle<int> r = getLocalBounds();
-    scope.setBounds(r.reduced(50).withTrimmedBottom(50));
+    scope.setBounds(r.reduced (border).withTrimmedBottom (border * 4));
 
-    auto dialArea = r.removeFromTop (r.getHeight() / 2);
-    smoothTimeDial.setBounds (dialArea.removeFromLeft (dialArea.getWidth() / 2).reduced (border));
+    auto dialArea = r.withTrimmedTop(15 * border);
+    smoothTimeDial.setBounds (dialArea);
 }

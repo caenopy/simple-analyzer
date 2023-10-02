@@ -35,8 +35,11 @@ PluginProcessor::PluginProcessor()
     for (int i = 0; i < 2 * fftSize; ++i)
     {
         smoothedFftData[i] = 0;
+        maxSmoothedFftData[i] = 0;
         fftData[i] = 0;
     }
+
+    maxLeak = static_cast<float> (std::exp (-(fftSize) / (500.0 * 0.001 * fs))); // Arbitrarily choosing 500.0f for the upper limit of smoothTime
 }
 
 PluginProcessor::~PluginProcessor()
@@ -215,6 +218,7 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
                 for (int n = 0; n < fftSize / 2; n++)
                 {
                     smoothedFftData[n] = leak * smoothedFftData[n] + (1 - leak) * fftData[n];
+                    maxSmoothedFftData[n] = maxLeak * maxSmoothedFftData[n] + (1 - maxLeak) * fftData[n];
                 }
 
                 //            for (int n = 0; n < fftSize; n++)
@@ -240,7 +244,7 @@ juce::AudioProcessorEditor* PluginProcessor::createEditor()
     // Generic GUI for prototyping:
 //    return new juce::GenericAudioProcessorEditor (*this);
 
-     return new PluginEditor (*this, apvts);
+     return new PluginEditor (*this, apvts, fs);
 }
 
 //==============================================================================

@@ -13,7 +13,7 @@
 #include "PluginProcessor.h"
 
 //==============================================================================
-Analyzer::Analyzer(PluginProcessor& p) : processorRef (p)
+Analyzer::Analyzer(PluginProcessor& p, double samplingRate) : processorRef (p), fs(samplingRate)
 {
     // In your constructor, you should add any child components, and
     // initialise any special settings that your component needs.
@@ -58,53 +58,180 @@ void Analyzer::resized()
 
 void Analyzer::drawNextFrameOfSpectrum()
 {
-    auto mindB = -100.0f;
+    auto mindB = -80.0f;
     auto maxdB =    0.0f;
 
     auto smoothedFftData = processorRef.smoothedFftData;
+    float nyquist = fs * 0.5f;
+    float minFrequency = 20.0f;  // Starting from 20Hz
 
     for (int i = 0; i < scopeSize; ++i)
     {
-      auto skewedProportionX = 1.0f - std::exp (std::log (1.0f - (float) i / (float) PluginProcessor::scopeSize) * 0.2f);
-      auto fftDataIndex = juce::jlimit (0, PluginProcessor::fftSize / 2, (int) (skewedProportionX * (float) PluginProcessor::fftSize * 0.5f));
-      auto level = juce::jmap (juce::jlimit (mindB, maxdB, juce::Decibels::gainToDecibels (smoothedFftData[fftDataIndex])
-                                                               - juce::Decibels::gainToDecibels ((float) PluginProcessor::fftSize)),
-          mindB, maxdB, 0.0f, 1.0f);
+        float proportion = (float)i / (float)PluginProcessor::scopeSize;
+        float freq = minFrequency * std::pow(nyquist / minFrequency, proportion);
 
-      scopeData[i] = level;
+        // Calculate the index for this frequency in the FFT data
+        auto fftDataIndex = juce::jlimit(0, PluginProcessor::fftSize / 2, (int)(freq / nyquist * PluginProcessor::fftSize * 0.5f));
+
+        // Previously, we scaled the horizontal axis using the following skewed logarithmic scaling:
+        //  auto skewedProportionX = 1.0f - std::exp (std::log (1.0f - (float) i / (float) PluginProcessor::scopeSize) * 0.2f);
+        //  auto fftDataIndex = juce::jlimit (0, PluginProcessor::fftSize / 2, (int) (skewedProportionX * (float) PluginProcessor::fftSize * 0.5f));
+
+        auto level = juce::jmap(juce::jlimit(mindB, maxdB, juce::Decibels::gainToDecibels(smoothedFftData[fftDataIndex])
+                                                                 - juce::Decibels::gainToDecibels((float)PluginProcessor::fftSize)),
+            mindB, maxdB, 0.0f, 1.0f);
+
+        scopeData[i] = level;
     }
 }
 
-void Analyzer::drawFrame (juce::Graphics& g)
+void Analyzer::drawGrid(juce::Graphics& g, float width, float height, float mindB, float maxdB)
+{
+    // Colors and styles
+    g.setColour(juce::Colours::grey);
+    g.setOpacity(0.5f);
+    float lineThickness = 1.5f;
+
+    // Determine the Nyquist frequency (half the sampling rate)
+    float nyquist = fs * 0.5f;
+    float minFrequency = 20.0f;  // Starting from 20Hz, which is a common minimum for audio applications
+
+    // Starting frequency for drawing the grid
+    float baseFreq = 10.0f;
+
+    while (baseFreq < nyquist)
+    {
+      // Draw major division
+      drawVerticalLineForFrequency(g, baseFreq, height, width, height, nyquist, minFrequency, lineThickness);
+
+      // Draw minor divisions
+      for (int multiplier = 2; multiplier < 10 && baseFreq * multiplier <= nyquist; ++multiplier)
+      {
+          drawVerticalLineForFrequency(g, baseFreq * multiplier, height, width, height, nyquist, minFrequency, lineThickness * 0.7f);  // Reduced line thickness for minor divisions
+      }
+
+      baseFreq *= 10.0f;
+    }
+
+    // Draw horizontal lines for dB values
+    float dbInterval = 10.0f; // Adjust as needed
+
+    for (float db = mindB; db <= maxdB; db += dbInterval)
+    {
+      float y = juce::jmap<float>(db, mindB, maxdB, (float) height, 0.0f);
+      g.drawLine(0.0f, y, (float) width, y, lineThickness * 0.7f);
+    }
+}
+
+void Analyzer::drawVerticalLineForFrequency(juce::Graphics& g, float freq, float level, int width, int height, float nyquist, float minFrequency, float lineThickness)
+{
+    float logX;
+    float x;
+
+    if (freq < minFrequency)
+    {
+      return;
+    } else if (freq == 0.0)
+    {
+      x = 0;
+    } else
+    {
+      logX = (std::log(freq) - std::log(minFrequency)) / (std::log(nyquist) - std::log(minFrequency));
+      x = logX * width;
+    }
+
+    g.drawLine(x, (float) height, x, (float) height - level, lineThickness);
+}
+
+void Analyzer::drawSpectrum(juce::Graphics& g, float width, float height, float mindB, float maxdB)
+{
+    int numFFTPoints = PluginProcessor::fftSize / 2;
+    auto smoothedFftData = processorRef.maxSmoothedFftData;
+    float nyquist = fs * 0.5f;
+    float minFrequency = 20.0f;  // Starting from 20Hz
+
+    for (int i = 0; i < numFFTPoints; ++i)
+    {
+      float proportion = (float)i / (float)numFFTPoints;
+      float freq = proportion * nyquist;
+
+      // Draw the spectrum using vertical lines
+      float level = juce::jmap(juce::jlimit(mindB, maxdB, juce::Decibels::gainToDecibels(smoothedFftData[i])
+                                                                - juce::Decibels::gainToDecibels((float)PluginProcessor::fftSize)),
+          mindB, maxdB, 0.0f, (float)getLocalBounds().getHeight());
+
+      drawVerticalLineForFrequency(g, freq, level, width, height, nyquist, minFrequency, 1.0);
+    }
+}
+
+void Analyzer::drawOutline(juce::Graphics& g, float width, float height, float mindB, float maxdB)
+{
+    int numFFTPoints = PluginProcessor::fftSize / 2;
+    auto smoothedFftData = processorRef.smoothedFftData;
+    float nyquist = fs * 0.5f;
+    float minFrequency = 20.0f;  // Starting from 20Hz
+
+    juce::Path outlinePath;  // This will store the outline of the spectrum
+
+    for (int i = 0; i < numFFTPoints; ++i)
+    {
+      float proportion = (float)i / (float)numFFTPoints;
+      float freq = proportion * nyquist;
+
+      // dB level sets vertical position
+      float level = juce::jmap(juce::jlimit(mindB, maxdB, juce::Decibels::gainToDecibels(smoothedFftData[i])
+                                                                - juce::Decibels::gainToDecibels((float)PluginProcessor::fftSize)),
+          mindB, maxdB, 0.0f, (float)height);
+
+      // Horizontal position uses logarithmic scaling
+      float logX;
+      float x;
+
+      if (freq < minFrequency)
+      {
+          x = 0;
+      } else
+      {
+          logX = (std::log(freq) - std::log(minFrequency)) / (std::log(nyquist) - std::log(minFrequency));
+          x = logX * width;
+      }
+
+      // Add the point to the outline path
+      if (i == 0)  // If it's the first point, start a new sub-path
+          outlinePath.startNewSubPath(x, height - level);
+      else
+          outlinePath.lineTo(x, height - level);
+    }
+
+    // Create a rounded version of the outline path
+    juce::Path roundedOutline = outlinePath.createPathWithRoundedCorners(20.0f);  // Adjust the rounding radius as needed
+
+    // Draw the rounded outline (only the top edge)
+    g.strokePath(roundedOutline, juce::PathStrokeType(2.0f));  // Adjust the stroke type as needed
+}
+
+
+void Analyzer::drawFrame(juce::Graphics& g)
 {
     auto width  = getLocalBounds().getWidth();
     auto height = getLocalBounds().getHeight();
+    float mindB = -80.0f; // Adjust as needed
+    float maxdB = 0.0f;   // Adjust as needed
 
-    juce::Path path;
-    path.preallocateSpace(8 + scopeSize * 3);
-    path.startNewSubPath (
-      juce::jmap<float> (0, 0, scopeSize - 1, 0, width),
-      juce::jmap<float> (scopeData[0], 0.0f, 1.0f, (float) height, 0.0f)
-    );
+    // First draw the grid
+    drawGrid(g, width, height, mindB, maxdB);
 
-    for (int i = 1; i < scopeSize; ++i)
-    {
-      path.lineTo (
-          juce::jmap<float> (i,     0, scopeSize - 1, 0, width),
-          juce::jmap<float> (scopeData[i],     0.0f, 1.0f, (float) height, 0.0f)
-      );
-      //        g.drawLine ({
-      //                        (float) juce::jmap (i - 1, 0, scopeSize - 1, 0, width),
-      //                        juce::jmap (scopeData[i - 1], 0.0f, 1.0f, (float) height, 0.0f),
-      //                        (float) juce::jmap (i,     0, scopeSize - 1, 0, width),
-      //                        juce::jmap (scopeData[i],     0.0f, 1.0f, (float) height, 0.0f) },
-      //                2.0f);
-    }
+    // Change color
+    g.setColour(juce::Colours::grey);
 
-    path.lineTo (getLocalBounds().getBottomRight().toFloat());
-    path.lineTo (getLocalBounds().getBottomLeft().toFloat());
-    path.closeSubPath();
-    g.fillPath (path.createPathWithRoundedCorners(2));
+    // Then draw spectrum outline
+    drawOutline(g, width, height, mindB, maxdB);
+
+    // Change color
+    g.setColour(juce::Colours::white);
+
+    // Now plot the spectrum
+    drawSpectrum(g, width, height, mindB, maxdB);
 
 
 }
