@@ -7,12 +7,17 @@ class PluginEditor : public juce::AudioProcessorEditor
 
 {
 public:
-    explicit PluginEditor (PluginProcessor&, juce::AudioProcessorValueTreeState&, double);
+    PluginEditor (PluginProcessor& p,
+                  juce::AudioProcessorValueTreeState& vts,
+                  juce::UndoManager& um,
+                  double fs);
     ~PluginEditor() override;
 
     //==============================================================================
     void paint (juce::Graphics&) override;
     void resized() override;
+
+    bool keyPressed (const juce::KeyPress& key) override;
 
     typedef juce::AudioProcessorValueTreeState::SliderAttachment SliderAttachment;
 
@@ -20,6 +25,7 @@ private:
     // This reference is provided as a quick way for your editor to
     // access the processor object that created it.
     PluginProcessor& processorRef;
+    juce::UndoManager& undoManager;
     juce::AudioProcessorValueTreeState& apvts;
 
     Analyzer scope;

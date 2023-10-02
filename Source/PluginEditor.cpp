@@ -4,12 +4,14 @@
 #include "PluginProcessor.h"
 
 //==============================================================================
-PluginEditor::PluginEditor (PluginProcessor& p, juce::AudioProcessorValueTreeState& vts, double fs)
+PluginEditor::PluginEditor (PluginProcessor& p, juce::AudioProcessorValueTreeState& vts, juce::UndoManager& um, double fs)
     : AudioProcessorEditor (&p),
       processorRef (p),
+      undoManager (um),
       apvts (vts),
       scope (p, fs)
 {
+    setWantsKeyboardFocus (true);
     juce::ignoreUnused (processorRef);
 
     // Make sure that before the constructor has finished, you've set the
@@ -47,4 +49,26 @@ void PluginEditor::resized()
 
     auto dialArea = r.withTrimmedTop(15 * border);
     smoothTimeDial.setBounds (dialArea);
+}
+
+bool PluginEditor::keyPressed (const juce::KeyPress& key)
+{
+    const auto cmdZ = juce::KeyPress { 'z', juce::ModifierKeys::commandModifier, 0 };
+
+    if (key == cmdZ && undoManager.canUndo())
+    {
+        undoManager.undo();
+        return true;
+    }
+
+    const auto cmdShiftZ = juce::KeyPress { 'z', juce::ModifierKeys::commandModifier
+                                                     | juce::ModifierKeys::shiftModifier, 0 };
+
+    if (key == cmdShiftZ && undoManager.canRedo())
+    {
+        undoManager.redo();
+        return true;
+    }
+
+    return false;
 }
