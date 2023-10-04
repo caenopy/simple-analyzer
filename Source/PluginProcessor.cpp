@@ -38,8 +38,6 @@ PluginProcessor::PluginProcessor()
         maxSmoothedFftData[i] = 0;
         fftData[i] = 0;
     }
-
-    maxLeak = static_cast<float> (std::exp (-(fftSize) / (500.0 * 0.001 * fs))); // Arbitrarily choosing 500.0f for the upper limit of smoothTime
 }
 
 PluginProcessor::~PluginProcessor()
@@ -119,6 +117,23 @@ void PluginProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
     juce::ignoreUnused (sampleRate, samplesPerBlock);
 
     fs = sampleRate;
+
+    float upperLimit;
+    AudioParameterFloat* st = dynamic_cast<AudioParameterFloat*>(apvts.getParameter("smoothTime"));
+    if (st)
+    {
+        upperLimit = st->range.end;
+        // upperLimit now contains the value 500, or whatever the maximum of your NormalisableRange is.
+    }
+    else
+    {
+        upperLimit = 0.95;
+    }
+    maxLeak = static_cast<float> (std::exp (-(fftSize) / (upperLimit * 0.001 * fs)));
+
+    float defaultSmoothTime = *apvts.getRawParameterValue(smoothTime);
+    leak = defaultSmoothTime < .1 ? 0.0 : static_cast<float> (std::exp (-(fftSize) / (defaultSmoothTime * 0.001 * fs)));
+
     preparedToPlay = true;
 }
 
@@ -217,7 +232,7 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
                 // Smooth FFT data for visualization
                 for (int n = 0; n < fftSize / 2; n++)
                 {
-                    smoothedFftData[n] = leak * smoothedFftData[n] + (1 - leak) * fftData[n];
+                    smoothedFftData[n]    = leak    * smoothedFftData[n]    + (1 - leak)    * fftData[n];
                     maxSmoothedFftData[n] = maxLeak * maxSmoothedFftData[n] + (1 - maxLeak) * fftData[n];
                 }
 

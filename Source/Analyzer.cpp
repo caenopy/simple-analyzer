@@ -146,7 +146,7 @@ void Analyzer::drawVerticalLineForFrequency(juce::Graphics& g, float freq, float
 void Analyzer::drawSpectrum(juce::Graphics& g, float width, float height, float mindB, float maxdB)
 {
     int numFFTPoints = PluginProcessor::fftSize / 2;
-    auto smoothedFftData = processorRef.maxSmoothedFftData;
+    auto smoothedFftData = processorRef.smoothedFftData;
     float nyquist = fs * 0.5f;
     float minFrequency = 20.0f;  // Starting from 20Hz
 
@@ -160,14 +160,14 @@ void Analyzer::drawSpectrum(juce::Graphics& g, float width, float height, float 
                                                                 - juce::Decibels::gainToDecibels((float)PluginProcessor::fftSize)),
           mindB, maxdB, 0.0f, (float)getLocalBounds().getHeight());
 
-      drawVerticalLineForFrequency(g, freq, level, width, height, nyquist, minFrequency, 1.0);
+      drawVerticalLineForFrequency(g, freq, level, width, height, nyquist, minFrequency, 1.5);
     }
 }
 
 void Analyzer::drawOutline(juce::Graphics& g, float width, float height, float mindB, float maxdB)
 {
     int numFFTPoints = PluginProcessor::fftSize / 2;
-    auto smoothedFftData = processorRef.smoothedFftData;
+    auto smoothedFftData = processorRef.maxSmoothedFftData;
     float nyquist = fs * 0.5f;
     float minFrequency = 20.0f;  // Starting from 20Hz
 
@@ -208,6 +208,12 @@ void Analyzer::drawOutline(juce::Graphics& g, float width, float height, float m
 
     // Draw the rounded outline (only the top edge)
     g.strokePath(roundedOutline, juce::PathStrokeType(2.0f));  // Adjust the stroke type as needed
+
+    // Fill in outline
+    roundedOutline.lineTo (getLocalBounds().getBottomRight().toFloat());
+    roundedOutline.lineTo (getLocalBounds().getBottomLeft().toFloat());
+    roundedOutline.closeSubPath();
+    g.fillPath (roundedOutline);
 }
 
 
@@ -217,6 +223,32 @@ void Analyzer::drawFrame(juce::Graphics& g)
     auto height = getLocalBounds().getHeight();
     float mindB = -80.0f; // Adjust as needed
     float maxdB = 0.0f;   // Adjust as needed
+
+//    juce::Path path;
+//    path.preallocateSpace(8 + scopeSize * 3);
+//    path.startNewSubPath (
+//        juce::jmap<float> (0, 0, scopeSize - 1, 0, width),
+//        juce::jmap<float> (scopeData[0], 0.0f, 1.0f, (float) height, 0.0f)
+//    );
+//
+//    for (int i = 1; i < scopeSize; ++i)
+//    {
+//      path.lineTo (
+//          juce::jmap<float> (i,     0, scopeSize - 1, 0, width),
+//          juce::jmap<float> (scopeData[i],     0.0f, 1.0f, (float) height, 0.0f)
+//      );
+//      //        g.drawLine ({
+//      //                        (float) juce::jmap (i - 1, 0, scopeSize - 1, 0, width),
+//      //                        juce::jmap (scopeData[i - 1], 0.0f, 1.0f, (float) height, 0.0f),
+//      //                        (float) juce::jmap (i,     0, scopeSize - 1, 0, width),
+//      //                        juce::jmap (scopeData[i],     0.0f, 1.0f, (float) height, 0.0f) },
+//      //                2.0f);
+//    }
+//
+//    path.lineTo (getLocalBounds().getBottomRight().toFloat());
+//    path.lineTo (getLocalBounds().getBottomLeft().toFloat());
+//    path.closeSubPath();
+//    g.fillPath (path.createPathWithRoundedCorners(2));
 
     // First draw the grid
     drawGrid(g, width, height, mindB, maxdB);
